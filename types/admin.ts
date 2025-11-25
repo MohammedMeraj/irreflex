@@ -1,0 +1,63 @@
+export interface Admin {
+  admin_id: number;
+  email: string;
+  phone_number?: string;
+  password_hash: string;
+  role: string;
+  access_level: number;
+  first_name: string;
+  middle_name?: string;
+  last_name: string;
+  gender?: string;
+  date_of_birth?: string;
+  campus_id?: number;
+  department_id?: number;
+  college_name?: string;
+  college_address?: string;
+  profile_image_url?: string;
+  address_line1?: string;
+  address_line2?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  country?: string;
+  email_verified: boolean;
+  phone_verified: boolean;
+  two_factor_enabled: boolean;
+  two_factor_secret?: string;
+  created_at: string;
+  updated_at: string;
+  last_login_at?: string;
+  password_changed_at?: string;
+  failed_login_attempts: number;
+  is_locked: boolean;
+  is_active: boolean;
+  last_ip_address?: string;
+  login_device_info?: any;
+  notes?: string;
+}
+
+export interface AdminFormData {
+  email: string;
+  phone_number?: string;
+  password?: string;
+  role: string;
+  access_level: number;
+  first_name: string;
+  middle_name?: string;
+  last_name: string;
+  gender?: string;
+  date_of_birth?: string;
+  campus_id?: number;
+  department_id?: number;
+  college_name?: string;
+  college_address?: string;
+  profile_image_url?: string;
+  address_line1?: string;
+  address_line2?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  country?: string;
+  notes?: string;
+}
