@@ -13,6 +13,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Plus, Search, RefreshCw, Users, UserCheck, UserX, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
+export const dynamic = 'force-dynamic';
+
 const Developer = () => {
   const [activeSection, setActiveSection] = useState('admins');
   const [admins, setAdmins] = useState<Admin[]>([]);
