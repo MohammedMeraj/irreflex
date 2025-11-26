@@ -9,6 +9,7 @@ import {
   Settings,
   LogOut,
   Menu,
+  Building2,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -38,6 +39,11 @@ const menuItems = [
     title: 'Faculty Management',
     icon: Users,
     section: 'faculty',
+  },
+  {
+    title: 'Departments',
+    icon: Building2,
+    section: 'departments',
   },
   {
     title: 'Statistics',

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Faculty, FacultyFormData } from '@/types/faculty';
+import { Department, DepartmentFormData } from '@/types/department';
 import {
   getAllFaculty,
   createFaculty,
@@ -11,14 +12,25 @@ import {
   promoteToHOD,
   searchFaculty,
 } from '@/lib/faculty-service';
+import {
+  getAllDepartments,
+  createDepartment,
+  updateDepartment,
+  deleteDepartment,
+  toggleDepartmentActiveStatus,
+  searchDepartments,
+} from '@/lib/department-service';
 import { AdminSidebar } from '@/components/admin/admin-sidebar';
 import { FacultyTable } from '@/components/admin/faculty-table';
 import { FacultyFormDialog } from '@/components/admin/faculty-form-dialog';
 import { FacultyViewDialog } from '@/components/admin/faculty-view-dialog';
+import { DepartmentTable } from '@/components/admin/department-table';
+import { DepartmentFormDialog } from '@/components/admin/department-form-dialog';
+import { DepartmentViewDialog } from '@/components/admin/department-view-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Search, Users, UserCheck, UserX, Crown } from 'lucide-react';
+import { Plus, Search, Users, UserCheck, UserX, Crown, Building2, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const dynamic = 'force-dynamic';
@@ -27,13 +39,23 @@ export const dynamic = 'force-dynamic';
 const current_user = 'mdmomin7517@gmail.com';
 
 export default function AdminPage() {
+  const [activeSection, setActiveSection] = useState('faculty');
   const [faculty, setFaculty] = useState<Faculty[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Faculty dialogs
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [selectedFaculty, setSelectedFaculty] = useState<Faculty | null>(null);
+
+  // Department dialogs
+  const [isDeptAddDialogOpen, setIsDeptAddDialogOpen] = useState(false);
+  const [isDeptEditDialogOpen, setIsDeptEditDialogOpen] = useState(false);
+  const [isDeptViewDialogOpen, setIsDeptViewDialogOpen] = useState(false);
+  const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
 
   // Statistics
   const totalFaculty = faculty.length;
@@ -41,9 +63,17 @@ export default function AdminPage() {
   const inactiveFaculty = faculty.filter((f) => !f.is_active).length;
   const hodCount = faculty.filter((f) => f.is_hod).length;
 
+  const totalDepartments = departments.length;
+  const activeDepartments = departments.filter((d) => d.is_department_active).length;
+  const inactiveDepartments = departments.filter((d) => !d.is_department_active).length;
+
   useEffect(() => {
-    loadFaculty();
-  }, []);
+    if (activeSection === 'faculty') {
+      loadFaculty();
+    } else if (activeSection === 'departments') {
+      loadDepartments();
+    }
+  }, [activeSection]);
 
   const loadFaculty = async () => {
     try {
@@ -53,6 +83,21 @@ export default function AdminPage() {
     } catch (error) {
       console.error('Error loading faculty:', error);
       toast.error('Failed to load faculty members');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadDepartments = async () => {
+    try {
+      setLoading(true);
+      console.log('Loading departments...');
+      const data = await getAllDepartments();
+      console.log('Departments loaded:', data);
+      setDepartments(data);
+    } catch (error) {
+      console.error('Error loading departments:', error);
+      toast.error('Failed to load departments: ' + (error as Error).message);
     } finally {
       setLoading(false);
     }
@@ -161,144 +206,352 @@ export default function AdminPage() {
     setIsEditDialogOpen(true);
   };
 
+  // Department handlers
+  const handleDepartmentSearch = async () => {
+    if (!searchQuery.trim()) {
+      loadDepartments();
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const results = await searchDepartments(searchQuery);
+      setDepartments(results);
+      toast.success(`Found ${results.length} department(s)`);
+    } catch (error) {
+      console.error('Error searching departments:', error);
+      toast.error('Failed to search departments');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDepartmentAdd = async (data: DepartmentFormData) => {
+    try {
+      console.log('Adding department:', data);
+      await createDepartment(data, current_user);
+      toast.success('Department added successfully');
+      loadDepartments();
+    } catch (error) {
+      console.error('Error adding department:', error);
+      toast.error('Failed to add department: ' + (error as Error).message);
+      throw error;
+    }
+  };
+
+  const handleDepartmentEdit = async (data: DepartmentFormData) => {
+    if (!selectedDepartment) return;
+
+    try {
+      await updateDepartment(selectedDepartment.department_id, data);
+      toast.success('Department updated successfully');
+      loadDepartments();
+    } catch (error) {
+      console.error('Error updating department:', error);
+      toast.error('Failed to update department');
+      throw error;
+    }
+  };
+
+  const handleDepartmentDelete = async (department: Department) => {
+    if (!confirm(`Are you sure you want to delete ${department.department_name}?`)) {
+      return;
+    }
+
+    try {
+      await deleteDepartment(department.department_id);
+      toast.success('Department deleted successfully');
+      loadDepartments();
+    } catch (error) {
+      console.error('Error deleting department:', error);
+      toast.error('Failed to delete department');
+    }
+  };
+
+  const handleDepartmentToggleActive = async (department: Department) => {
+    try {
+      await toggleDepartmentActiveStatus(department.department_id, !department.is_department_active);
+      toast.success(
+        `Department ${department.is_department_active ? 'deactivated' : 'activated'} successfully`
+      );
+      loadDepartments();
+    } catch (error) {
+      console.error('Error toggling department status:', error);
+      toast.error('Failed to toggle department status');
+    }
+  };
+
+  const handleDepartmentView = (department: Department) => {
+    setSelectedDepartment(department);
+    setIsDeptViewDialogOpen(true);
+  };
+
+  const handleDepartmentEditClick = (department: Department) => {
+    setSelectedDepartment(department);
+    setIsDeptEditDialogOpen(true);
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <main className="flex-1 overflow-y-auto">
-        <div className="container mx-auto p-6 space-y-6">
-          {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold">Faculty Management</h1>
-              <p className="text-muted-foreground">
-                Manage faculty members and their information
-              </p>
-            </div>
-            <Button onClick={() => setIsAddDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Faculty
-            </Button>
-          </div>
-
-          {/* Statistics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Faculty
-                </CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{totalFaculty}</div>
-                <p className="text-xs text-muted-foreground">
-                  All faculty members
+    <AdminSidebar activeSection={activeSection} onSectionChange={setActiveSection}>
+      <div className="space-y-6">
+        {activeSection === 'faculty' && (
+          <>
+            {/* Header */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <h1 className="text-3xl font-bold">Faculty Management</h1>
+                <p className="text-muted-foreground">
+                  Manage faculty members and their information
                 </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Active Faculty
-                </CardTitle>
-                <UserCheck className="h-4 w-4 text-green-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{activeFaculty}</div>
-                <p className="text-xs text-muted-foreground">
-                  Currently active
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Inactive Faculty
-                </CardTitle>
-                <UserX className="h-4 w-4 text-red-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{inactiveFaculty}</div>
-                <p className="text-xs text-muted-foreground">
-                  Currently inactive
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">HODs</CardTitle>
-                <Crown className="h-4 w-4 text-yellow-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{hodCount}</div>
-                <p className="text-xs text-muted-foreground">
-                  Heads of Department
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Search Bar */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                  <Input
-                    placeholder="Search by name, email, department..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                    className="pl-10"
-                  />
-                </div>
-                <Button onClick={handleSearch} disabled={loading}>
-                  <Search className="mr-2 h-4 w-4" />
-                  Search
-                </Button>
-                {searchQuery && (
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setSearchQuery('');
-                      loadFaculty();
-                    }}
-                  >
-                    Clear
-                  </Button>
-                )}
               </div>
-            </CardContent>
-          </Card>
+              <Button onClick={() => setIsAddDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Faculty
+              </Button>
+            </div>
 
-          {/* Faculty Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Faculty Members</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Loading faculty...
+            {/* Statistics Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Total Faculty
+                  </CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{totalFaculty}</div>
+                  <p className="text-xs text-muted-foreground">
+                    All faculty members
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Active Faculty
+                  </CardTitle>
+                  <UserCheck className="h-4 w-4 text-green-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{activeFaculty}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Currently active
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Inactive Faculty
+                  </CardTitle>
+                  <UserX className="h-4 w-4 text-red-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{inactiveFaculty}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Currently inactive
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">HODs</CardTitle>
+                  <Crown className="h-4 w-4 text-yellow-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{hodCount}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Heads of Department
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Search Bar */}
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                    <Input
+                      placeholder="Search by name, email, department..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                      className="pl-10"
+                    />
+                  </div>
+                  <Button onClick={handleSearch} disabled={loading}>
+                    <Search className="mr-2 h-4 w-4" />
+                    Search
+                  </Button>
+                  {searchQuery && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setSearchQuery('');
+                        loadFaculty();
+                      }}
+                    >
+                      Clear
+                    </Button>
+                  )}
                 </div>
-              ) : (
-                <FacultyTable
-                  faculty={faculty}
-                  onView={handleView}
-                  onEdit={handleEditClick}
-                  onDelete={handleDelete}
-                  onToggleActive={handleToggleActive}
-                  onPromoteToHOD={handlePromoteToHOD}
-                />
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </main>
+              </CardContent>
+            </Card>
 
-      {/* Dialogs */}
+            {/* Faculty Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Faculty Members</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Loading faculty...
+                  </div>
+                ) : (
+                  <FacultyTable
+                    faculty={faculty}
+                    onView={handleView}
+                    onEdit={handleEditClick}
+                    onDelete={handleDelete}
+                    onToggleActive={handleToggleActive}
+                    onPromoteToHOD={handlePromoteToHOD}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
+
+        {activeSection === 'departments' && (
+          <>
+            {/* Header */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <h1 className="text-3xl font-bold">Department Management</h1>
+                <p className="text-muted-foreground">
+                  Manage departments and their information
+                </p>
+              </div>
+              <Button onClick={() => setIsDeptAddDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Department
+              </Button>
+            </div>
+
+            {/* Statistics Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Total Departments
+                  </CardTitle>
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{totalDepartments}</div>
+                  <p className="text-xs text-muted-foreground">
+                    All departments
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Active Departments
+                  </CardTitle>
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{activeDepartments}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Currently active
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Inactive Departments
+                  </CardTitle>
+                  <XCircle className="h-4 w-4 text-red-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{inactiveDepartments}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Currently inactive
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Search Bar */}
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                    <Input
+                      placeholder="Search by department name or admin email..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleDepartmentSearch()}
+                      className="pl-10"
+                    />
+                  </div>
+                  <Button onClick={handleDepartmentSearch} disabled={loading}>
+                    <Search className="mr-2 h-4 w-4" />
+                    Search
+                  </Button>
+                  {searchQuery && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setSearchQuery('');
+                        loadDepartments();
+                      }}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Department Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Departments</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Loading departments...
+                  </div>
+                ) : (
+                  <DepartmentTable
+                    departments={departments}
+                    onView={handleDepartmentView}
+                    onEdit={handleDepartmentEditClick}
+                    onDelete={handleDepartmentDelete}
+                    onToggleActive={handleDepartmentToggleActive}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </div>
+
+      {/* Faculty Dialogs */}
       <FacultyFormDialog
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}
@@ -319,6 +572,28 @@ export default function AdminPage() {
         onOpenChange={setIsViewDialogOpen}
         faculty={selectedFaculty}
       />
-    </div>
+
+      {/* Department Dialogs */}
+      <DepartmentFormDialog
+        open={isDeptAddDialogOpen}
+        onOpenChange={setIsDeptAddDialogOpen}
+        onSave={handleDepartmentAdd}
+        isEdit={false}
+      />
+
+      <DepartmentFormDialog
+        open={isDeptEditDialogOpen}
+        onOpenChange={setIsDeptEditDialogOpen}
+        department={selectedDepartment}
+        onSave={handleDepartmentEdit}
+        isEdit={true}
+      />
+
+      <DepartmentViewDialog
+        open={isDeptViewDialogOpen}
+        onOpenChange={setIsDeptViewDialogOpen}
+        department={selectedDepartment}
+      />
+    </AdminSidebar>
   );
 }
