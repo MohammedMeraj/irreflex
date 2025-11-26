@@ -177,22 +177,21 @@ export default function AdminPage() {
   };
 
   const handlePromoteToHOD = async (faculty: Faculty) => {
-    if (faculty.is_hod) {
-      toast.info('This faculty member is already an HOD');
-      return;
-    }
-
-    if (!confirm(`Promote ${faculty.faculty_first_name} ${faculty.faculty_last_name} to HOD?`)) {
+    const newStatus = !faculty.is_hod;
+    const action = newStatus ? 'promote' : 'demote';
+    const actionText = newStatus ? 'Promote' : 'Demote';
+    
+    if (!confirm(`${actionText} ${faculty.faculty_first_name} ${faculty.faculty_last_name} ${newStatus ? 'to' : 'from'} HOD?`)) {
       return;
     }
 
     try {
-      await promoteToHOD(faculty.unique_id, true);
-      toast.success('Faculty member promoted to HOD successfully');
+      await promoteToHOD(faculty.unique_id, newStatus);
+      toast.success(`Faculty member ${action}d ${newStatus ? 'to' : 'from'} HOD successfully`);
       loadFaculty();
     } catch (error) {
-      console.error('Error promoting to HOD:', error);
-      toast.error('Failed to promote faculty to HOD');
+      console.error(`Error ${action}ing HOD:`, error);
+      toast.error(`Failed to ${action} faculty ${newStatus ? 'to' : 'from'} HOD`);
     }
   };
 
