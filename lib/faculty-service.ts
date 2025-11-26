@@ -109,3 +109,33 @@ export async function searchFaculty(searchTerm: string): Promise<Faculty[]> {
   if (error) throw error;
   return data || [];
 }
+
+// Get available HODs (faculty not assigned as HOD to any department)
+export async function getAvailableHODs(): Promise<Faculty[]> {
+  // First get all faculty who are active
+  const { data: allFaculty, error: facultyError } = await supabase
+    .from('faculty')
+    .select('*')
+    .eq('is_active', true)
+    .order('faculty_first_name', { ascending: true });
+
+  if (facultyError) throw facultyError;
+
+  // Get all departments with HODs assigned
+  const { data: departments, error: deptError } = await supabase
+    .from('department')
+    .select('department_hod_id')
+    .not('department_hod_id', 'is', null);
+
+  if (deptError) throw deptError;
+
+  // Extract HOD IDs that are already assigned
+  const assignedHODIds = new Set(departments?.map(d => d.department_hod_id) || []);
+
+  // Filter out faculty who are already assigned as HOD
+  const availableFaculty = (allFaculty || []).filter(
+    faculty => !assignedHODIds.has(faculty.unique_id)
+  );
+
+  return availableFaculty;
+}

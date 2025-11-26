@@ -19,6 +19,8 @@ import {
   deleteDepartment,
   toggleDepartmentActiveStatus,
   searchDepartments,
+  getDepartmentByHODId,
+  removeHODAndDeactivateDepartment,
 } from '@/lib/department-service';
 import { AdminSidebar } from '@/components/admin/admin-sidebar';
 import { FacultyTable } from '@/components/admin/faculty-table';
@@ -181,6 +183,49 @@ export default function AdminPage() {
     const action = newStatus ? 'promote' : 'demote';
     const actionText = newStatus ? 'Promote' : 'Demote';
     
+    // If demoting, check if faculty is HOD of a department and show serious warning
+    if (!newStatus && faculty.is_hod) {
+      // Get the department this faculty is HOD of
+      const department = await getDepartmentByHODId(faculty.unique_id);
+      
+      if (department) {
+        const warningMessage = `⚠️ SERIOUS WARNING ⚠️
+
+Demoting ${faculty.faculty_first_name} ${faculty.faculty_last_name} as HOD will:
+
+1. Remove them as HOD from "${department.department_name}"
+2. DEACTIVATE the department "${department.department_name}"
+3. This action cannot be easily undone
+
+Department: ${department.department_name}
+Current Status: ${department.is_department_active ? 'Active' : 'Inactive'}
+
+Are you absolutely sure you want to proceed?`;
+
+        if (!confirm(warningMessage)) {
+          return;
+        }
+
+        // Perform the demotion with department deactivation
+        try {
+          // First remove HOD from department and deactivate it
+          await removeHODAndDeactivateDepartment(faculty.unique_id);
+          
+          // Then demote the faculty
+          await promoteToHOD(faculty.unique_id, false);
+          
+          toast.success(`Faculty demoted from HOD and department "${department.department_name}" has been deactivated`);
+          loadFaculty();
+          loadDepartments();
+        } catch (error) {
+          console.error('Error demoting HOD:', error);
+          toast.error('Failed to demote faculty from HOD');
+        }
+        return;
+      }
+    }
+    
+    // Normal promote action
     if (!confirm(`${actionText} ${faculty.faculty_first_name} ${faculty.faculty_last_name} ${newStatus ? 'to' : 'from'} HOD?`)) {
       return;
     }
@@ -226,11 +271,21 @@ export default function AdminPage() {
   };
 
   const handleDepartmentAdd = async (data: DepartmentFormData) => {
+    // Validate: Cannot create active department without HOD
+    if (data.is_department_active && !data.department_hod_id) {
+      toast.error('Cannot create an active department without assigning a HOD');
+      throw new Error('HOD is required for active departments');
+    }
+
     try {
       console.log('Adding department:', data);
       await createDepartment(data, current_user);
-      toast.success('Department added successfully');
+      toast.success('Department added successfully' + (data.department_hod_id ? ' and HOD assigned' : ''));
       loadDepartments();
+      // Reload faculty to reflect HOD status changes
+      if (data.department_hod_id) {
+        loadFaculty();
+      }
     } catch (error) {
       console.error('Error adding department:', error);
       toast.error('Failed to add department: ' + (error as Error).message);
@@ -241,10 +296,18 @@ export default function AdminPage() {
   const handleDepartmentEdit = async (data: DepartmentFormData) => {
     if (!selectedDepartment) return;
 
+    // Validate: Cannot make department active without HOD
+    if (data.is_department_active && !data.department_hod_id) {
+      toast.error('Cannot activate department without assigning a HOD');
+      throw new Error('HOD is required for active departments');
+    }
+
     try {
       await updateDepartment(selectedDepartment.department_id, data);
       toast.success('Department updated successfully');
       loadDepartments();
+      // Reload faculty to reflect HOD status changes
+      loadFaculty();
     } catch (error) {
       console.error('Error updating department:', error);
       toast.error('Failed to update department');
@@ -261,6 +324,10 @@ export default function AdminPage() {
       await deleteDepartment(department.department_id);
       toast.success('Department deleted successfully');
       loadDepartments();
+      // Reload faculty to reflect HOD status changes if department had HOD
+      if (department.department_hod_id) {
+        loadFaculty();
+      }
     } catch (error) {
       console.error('Error deleting department:', error);
       toast.error('Failed to delete department');
@@ -268,6 +335,12 @@ export default function AdminPage() {
   };
 
   const handleDepartmentToggleActive = async (department: Department) => {
+    // If trying to activate, check if HOD is assigned
+    if (!department.is_department_active && !department.department_hod_id) {
+      toast.error('Cannot activate department without a HOD. Please assign a HOD first.');
+      return;
+    }
+
     try {
       await toggleDepartmentActiveStatus(department.department_id, !department.is_department_active);
       toast.success(

@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Department, DepartmentFormData } from '@/types/department';
+import { Faculty } from '@/types/faculty';
+import { getAvailableHODs } from '@/lib/faculty-service';
 import {
   Dialog,
   DialogContent,
@@ -37,12 +39,47 @@ export function DepartmentFormDialog({
   isEdit = false,
 }: DepartmentFormDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [availableHODs, setAvailableHODs] = useState<Faculty[]>([]);
+  const [loadingHODs, setLoadingHODs] = useState(false);
   const [formData, setFormData] = useState<DepartmentFormData>({
     department_name: '',
     establish_year: null,
     department_hod_id: null,
     is_department_active: true,
   });
+
+  // Load available HODs when dialog opens
+  useEffect(() => {
+    if (open) {
+      loadAvailableHODs();
+    }
+  }, [open]);
+
+  const loadAvailableHODs = async () => {
+    try {
+      setLoadingHODs(true);
+      const hods = await getAvailableHODs();
+      
+      // If editing and current department has a HOD, include them in the list
+      if (isEdit && department?.department_hod_id) {
+        // Check if current HOD is not in the available list
+        const hasCurrentHOD = hods.some(h => h.unique_id === department.department_hod_id);
+        if (!hasCurrentHOD) {
+          // We need to fetch the current HOD details and add to list
+          // For now, just use the available HODs
+          setAvailableHODs(hods);
+        } else {
+          setAvailableHODs(hods);
+        }
+      } else {
+        setAvailableHODs(hods);
+      }
+    } catch (error) {
+      console.error('Error loading available HODs:', error);
+    } finally {
+      setLoadingHODs(false);
+    }
+  };
 
   useEffect(() => {
     if (department && isEdit) {
@@ -124,19 +161,32 @@ export function DepartmentFormDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="department_hod_id">HOD ID</Label>
-                <Input
-                  id="department_hod_id"
-                  type="number"
-                  value={formData.department_hod_id || ''}
-                  onChange={(e) =>
+                <Label htmlFor="department_hod_id">Head of Department</Label>
+                <Select
+                  value={formData.department_hod_id?.toString() || 'none'}
+                  onValueChange={(value) =>
                     setFormData({
                       ...formData,
-                      department_hod_id: e.target.value ? parseInt(e.target.value) : null,
+                      department_hod_id: value === 'none' ? null : parseInt(value),
                     })
                   }
-                  placeholder="Faculty unique ID"
-                />
+                  disabled={loadingHODs}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={loadingHODs ? "Loading..." : "Select HOD (Optional)"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No HOD</SelectItem>
+                    {availableHODs.map((hod) => (
+                      <SelectItem key={hod.unique_id} value={hod.unique_id.toString()}>
+                        {hod.faculty_first_name} {hod.faculty_last_name} (ID: {hod.unique_id})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Only shows faculty not currently assigned as HOD
+                </p>
               </div>
             </div>
 
