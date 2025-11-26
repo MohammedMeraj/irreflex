@@ -72,8 +72,16 @@ export default function AdminPage() {
   useEffect(() => {
     if (activeSection === 'faculty') {
       loadFaculty();
+      // Load departments for the dropdown in faculty form
+      if (departments.length === 0) {
+        loadDepartments();
+      }
     } else if (activeSection === 'departments') {
       loadDepartments();
+      // Load faculty for the HOD names in department table
+      if (faculty.length === 0) {
+        loadFaculty();
+      }
     }
   }, [activeSection]);
 
@@ -195,7 +203,8 @@ Demoting ${faculty.faculty_first_name} ${faculty.faculty_last_name} as HOD will:
 
 1. Remove them as HOD from "${department.department_name}"
 2. DEACTIVATE the department "${department.department_name}"
-3. This action cannot be easily undone
+3. Update both Faculty and Department tables
+4. This action cannot be easily undone
 
 Department: ${department.department_name}
 Current Status: ${department.is_department_active ? 'Active' : 'Inactive'}
@@ -208,11 +217,8 @@ Are you absolutely sure you want to proceed?`;
 
         // Perform the demotion with department deactivation
         try {
-          // First remove HOD from department and deactivate it
+          // This function now updates both faculty.is_hod and department tables
           await removeHODAndDeactivateDepartment(faculty.unique_id);
-          
-          // Then demote the faculty
-          await promoteToHOD(faculty.unique_id, false);
           
           toast.success(`Faculty demoted from HOD and department "${department.department_name}" has been deactivated`);
           loadFaculty();
@@ -225,7 +231,13 @@ Are you absolutely sure you want to proceed?`;
       }
     }
     
-    // Normal promote action
+    // Normal promote action - but HOD can only be assigned through department management
+    if (newStatus) {
+      toast.error('Faculty can only be promoted to HOD by assigning them as HOD in Department Management section');
+      return;
+    }
+
+    // If somehow trying to demote without department (shouldn't happen)
     if (!confirm(`${actionText} ${faculty.faculty_first_name} ${faculty.faculty_last_name} ${newStatus ? 'to' : 'from'} HOD?`)) {
       return;
     }
@@ -611,6 +623,7 @@ Are you absolutely sure you want to proceed?`;
                 ) : (
                   <DepartmentTable
                     departments={departments}
+                    faculty={faculty}
                     onView={handleDepartmentView}
                     onEdit={handleDepartmentEditClick}
                     onDelete={handleDepartmentDelete}
@@ -627,6 +640,7 @@ Are you absolutely sure you want to proceed?`;
       <FacultyFormDialog
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}
+        departments={departments}
         onSave={handleAdd}
         isEdit={false}
       />
@@ -635,6 +649,7 @@ Are you absolutely sure you want to proceed?`;
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
         faculty={selectedFaculty}
+        departments={departments}
         onSave={handleEdit}
         isEdit={true}
       />

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Department } from '@/types/department';
+import { Faculty } from '@/types/faculty';
 import {
   Table,
   TableBody,
@@ -23,6 +24,7 @@ import {
 
 interface DepartmentTableProps {
   departments: Department[];
+  faculty: Faculty[];
   onEdit: (department: Department) => void;
   onDelete: (department: Department) => void;
   onToggleActive: (department: Department) => void;
@@ -31,11 +33,18 @@ interface DepartmentTableProps {
 
 export function DepartmentTable({
   departments,
+  faculty,
   onEdit,
   onDelete,
   onToggleActive,
   onView,
 }: DepartmentTableProps) {
+  const getHODName = (hodId: number | null) => {
+    if (!hodId) return null;
+    const hod = faculty.find(f => f.unique_id === hodId);
+    if (!hod) return `Unknown (ID: ${hodId})`;
+    return `${hod.faculty_first_name} ${hod.faculty_last_name}`;
+  };
   const formatDate = (dateString?: string) => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -62,7 +71,7 @@ export function DepartmentTable({
               <TableHead>ID</TableHead>
               <TableHead>Department Name</TableHead>
               <TableHead>Established Year</TableHead>
-              <TableHead>HOD ID</TableHead>
+              <TableHead>Head of Department</TableHead>
               <TableHead>Admin Email</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Created Date</TableHead>
@@ -86,9 +95,11 @@ export function DepartmentTable({
                 </TableCell>
                 <TableCell>
                   {dept.department_hod_id ? (
-                    <Badge variant="outline">HOD #{dept.department_hod_id}</Badge>
+                    <Badge variant="outline" className="font-medium">
+                      {getHODName(dept.department_hod_id)}
+                    </Badge>
                   ) : (
-                    '-'
+                    <span className="text-muted-foreground">No HOD</span>
                   )}
                 </TableCell>
                 <TableCell className="text-sm">

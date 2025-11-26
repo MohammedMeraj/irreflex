@@ -32,6 +32,28 @@ export async function getDepartmentById(id: number): Promise<Department> {
 
 // Create new department
 export async function createDepartment(departmentData: DepartmentFormData, adminEmail: string): Promise<Department> {
+  // If assigning a HOD, check if they're already HOD (faculty.is_hod = true)
+  if (departmentData.department_hod_id) {
+    const { data: faculty, error: facultyError } = await supabase
+      .from('faculty')
+      .select('is_hod, faculty_first_name, faculty_last_name')
+      .eq('unique_id', departmentData.department_hod_id)
+      .single();
+
+    if (facultyError) throw facultyError;
+
+    if (faculty?.is_hod) {
+      // Check which department they're HOD of
+      const { data: existingDept } = await supabase
+        .from('department')
+        .select('department_name')
+        .eq('department_hod_id', departmentData.department_hod_id)
+        .single();
+
+      throw new Error(`${faculty.faculty_first_name} ${faculty.faculty_last_name} is already HOD of "${existingDept?.department_name || 'another department'}". A faculty member can only be HOD of one department.`);
+    }
+  }
+
   const cleanData: any = {
     ...departmentData,
     admin_email: adminEmail,
@@ -42,6 +64,7 @@ export async function createDepartment(departmentData: DepartmentFormData, admin
 
   console.log('Creating department with data:', cleanData);
 
+  // Create department and update faculty in a transaction-like manner
   const { data, error } = await supabase
     .from('department')
     .insert([cleanData])
@@ -54,15 +77,20 @@ export async function createDepartment(departmentData: DepartmentFormData, admin
   }
   console.log('Department created:', data);
 
-  // If HOD is assigned, promote the faculty to HOD
+  // If HOD is assigned, update faculty.is_hod = true
   if (data.department_hod_id) {
-    try {
-      await promoteToHOD(data.department_hod_id, true);
-      console.log(`Faculty ${data.department_hod_id} promoted to HOD`);
-    } catch (hodError) {
+    const { error: hodError } = await supabase
+      .from('faculty')
+      .update({ is_hod: true })
+      .eq('unique_id', data.department_hod_id);
+
+    if (hodError) {
       console.error('Error promoting faculty to HOD:', hodError);
-      // Don't throw, department is created, just log the error
+      // Rollback: delete the department if faculty update fails
+      await supabase.from('department').delete().eq('department_id', data.department_id);
+      throw new Error('Failed to assign HOD. Department creation rolled back.');
     }
+    console.log(`Faculty ${data.department_hod_id} promoted to HOD in faculty table`);
   }
 
   return data;
@@ -82,12 +110,36 @@ export async function updateDepartment(id: number, departmentData: Partial<Depar
   const oldHODId = currentDept?.department_hod_id;
   const newHODId = departmentData.department_hod_id;
 
+  // If assigning a new HOD, check if they're already HOD (faculty.is_hod = true)
+  if (newHODId && newHODId !== oldHODId) {
+    const { data: faculty, error: facultyError } = await supabase
+      .from('faculty')
+      .select('is_hod, faculty_first_name, faculty_last_name')
+      .eq('unique_id', newHODId)
+      .single();
+
+    if (facultyError) throw facultyError;
+
+    if (faculty?.is_hod) {
+      // Check which department they're HOD of
+      const { data: existingDept } = await supabase
+        .from('department')
+        .select('department_name')
+        .eq('department_hod_id', newHODId)
+        .neq('department_id', id)
+        .single();
+
+      throw new Error(`${faculty.faculty_first_name} ${faculty.faculty_last_name} is already HOD of "${existingDept?.department_name || 'another department'}". A faculty member can only be HOD of one department.`);
+    }
+  }
+
   const updateData: any = { ...departmentData };
   
   // Clean up empty strings
   if (updateData.establish_year === '') updateData.establish_year = null;
   if (updateData.department_hod_id === '') updateData.department_hod_id = null;
 
+  // Update department table
   const { data, error } = await supabase
     .from('department')
     .update(updateData)
@@ -97,25 +149,39 @@ export async function updateDepartment(id: number, departmentData: Partial<Depar
 
   if (error) throw error;
 
-  // Handle HOD changes
+  // Handle HOD changes - update faculty table
   if (oldHODId !== newHODId) {
-    // If old HOD exists and is being removed/changed, demote them
+    // If old HOD exists and is being removed/changed, set is_hod = false
     if (oldHODId) {
-      try {
-        await promoteToHOD(oldHODId, false);
-        console.log(`Faculty ${oldHODId} demoted from HOD`);
-      } catch (hodError) {
-        console.error('Error demoting old HOD:', hodError);
+      const { error: demoteError } = await supabase
+        .from('faculty')
+        .update({ is_hod: false })
+        .eq('unique_id', oldHODId);
+
+      if (demoteError) {
+        console.error('Error demoting old HOD in faculty table:', demoteError);
+      } else {
+        console.log(`Faculty ${oldHODId} demoted from HOD (is_hod = false)`);
       }
     }
 
-    // If new HOD is assigned, promote them
+    // If new HOD is assigned, set is_hod = true
     if (newHODId) {
-      try {
-        await promoteToHOD(newHODId, true);
-        console.log(`Faculty ${newHODId} promoted to HOD`);
-      } catch (hodError) {
-        console.error('Error promoting new HOD:', hodError);
+      const { error: promoteError } = await supabase
+        .from('faculty')
+        .update({ is_hod: true })
+        .eq('unique_id', newHODId);
+
+      if (promoteError) {
+        console.error('Error promoting new HOD in faculty table:', promoteError);
+        // Rollback: revert department changes
+        await supabase
+          .from('department')
+          .update({ department_hod_id: oldHODId })
+          .eq('department_id', id);
+        throw new Error('Failed to assign HOD. Changes rolled back.');
+      } else {
+        console.log(`Faculty ${newHODId} promoted to HOD (is_hod = true)`);
       }
     }
   }
@@ -134,13 +200,17 @@ export async function deleteDepartment(id: number): Promise<void> {
 
   if (fetchError) throw fetchError;
 
-  // If department has an HOD, demote them before deleting
+  // If department has an HOD, set is_hod = false in faculty table before deleting
   if (dept?.department_hod_id) {
-    try {
-      await promoteToHOD(dept.department_hod_id, false);
-      console.log(`Faculty ${dept.department_hod_id} demoted from HOD before department deletion`);
-    } catch (hodError) {
-      console.error('Error demoting HOD before deletion:', hodError);
+    const { error: demoteError } = await supabase
+      .from('faculty')
+      .update({ is_hod: false })
+      .eq('unique_id', dept.department_hod_id);
+
+    if (demoteError) {
+      console.error('Error demoting HOD before deletion:', demoteError);
+    } else {
+      console.log(`Faculty ${dept.department_hod_id} demoted from HOD (is_hod = false) before department deletion`);
     }
   }
 
@@ -191,7 +261,8 @@ export async function getDepartmentByHODId(hodId: number): Promise<Department | 
 
 // Remove HOD from department and deactivate it
 export async function removeHODAndDeactivateDepartment(hodId: number): Promise<void> {
-  const { error } = await supabase
+  // Update department: remove HOD and deactivate
+  const { error: deptError } = await supabase
     .from('department')
     .update({ 
       department_hod_id: null,
@@ -199,5 +270,17 @@ export async function removeHODAndDeactivateDepartment(hodId: number): Promise<v
     })
     .eq('department_hod_id', hodId);
 
-  if (error) throw error;
+  if (deptError) throw deptError;
+
+  // Update faculty: set is_hod = false
+  const { error: facultyError } = await supabase
+    .from('faculty')
+    .update({ is_hod: false })
+    .eq('unique_id', hodId);
+
+  if (facultyError) {
+    console.error('Error updating faculty is_hod status:', facultyError);
+  } else {
+    console.log(`Faculty ${hodId} is_hod set to false in faculty table`);
+  }
 }

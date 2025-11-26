@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Faculty, FacultyFormData } from '@/types/faculty';
+import { Department } from '@/types/department';
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,7 @@ interface FacultyFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   faculty?: Faculty | null;
+  departments?: Department[];
   onSave: (data: FacultyFormData) => Promise<void>;
   isEdit?: boolean;
 }
@@ -33,10 +35,12 @@ export function FacultyFormDialog({
   open,
   onOpenChange,
   faculty,
+  departments = [],
   onSave,
   isEdit = false,
 }: FacultyFormDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [useCustomDepartment, setUseCustomDepartment] = useState(false);
   const [formData, setFormData] = useState<FacultyFormData>({
     faculty_first_name: '',
     faculty_last_name: '',
@@ -124,15 +128,62 @@ export function FacultyFormDialog({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="faculty_department">Department *</Label>
-                <Input
-                  id="faculty_department"
-                  required
-                  value={formData.faculty_department}
-                  onChange={(e) =>
-                    setFormData({ ...formData, faculty_department: e.target.value })
-                  }
-                  placeholder="e.g., Computer Science"
-                />
+                {!useCustomDepartment ? (
+                  <div className="space-y-2">
+                    <Select
+                      value={formData.faculty_department}
+                      onValueChange={(value) => {
+                        if (value === '__custom__') {
+                          setUseCustomDepartment(true);
+                          setFormData({ ...formData, faculty_department: '' });
+                        } else {
+                          setFormData({ ...formData, faculty_department: value });
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select or add department" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {departments.map((dept) => (
+                          <SelectItem key={dept.department_id} value={dept.department_name}>
+                            {dept.department_name}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="__custom__" className="text-primary font-medium">
+                          + Add New Department
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Select from list or click "Add New Department" to enter custom
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Input
+                      id="faculty_department"
+                      required
+                      value={formData.faculty_department}
+                      onChange={(e) =>
+                        setFormData({ ...formData, faculty_department: e.target.value })
+                      }
+                      placeholder="e.g., Computer Science"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setUseCustomDepartment(false);
+                        setFormData({ ...formData, faculty_department: '' });
+                      }}
+                      className="text-xs"
+                    >
+                      ← Back to department list
+                    </Button>
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="faculty_gender">Gender</Label>
