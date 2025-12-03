@@ -10,6 +10,7 @@ import {
   LogOut,
   Menu,
   Building2,
+  BookOpen,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -44,6 +45,11 @@ const menuItems = [
     title: 'Departments',
     icon: Building2,
     section: 'departments',
+  },
+  {
+    title: 'Subjects',
+    icon: BookOpen,
+    section: 'subjects',
   },
   {
     title: 'Statistics',

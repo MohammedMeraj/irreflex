@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Faculty, FacultyFormData } from '@/types/faculty';
 import { Department, DepartmentFormData } from '@/types/department';
+import { Subject, SubjectFormData } from '@/types/subject';
 import {
   getAllFaculty,
   createFaculty,
@@ -22,6 +23,13 @@ import {
   getDepartmentByHODId,
   removeHODAndDeactivateDepartment,
 } from '@/lib/department-service';
+import {
+  getAllSubjects,
+  createSubject,
+  updateSubject,
+  deleteSubject,
+  searchSubjects,
+} from '@/lib/subject-service';
 import { AdminSidebar } from '@/components/admin/admin-sidebar';
 import { FacultyTable } from '@/components/admin/faculty-table';
 import { FacultyFormDialog } from '@/components/admin/faculty-form-dialog';
@@ -29,10 +37,13 @@ import { FacultyViewDialog } from '@/components/admin/faculty-view-dialog';
 import { DepartmentTable } from '@/components/admin/department-table';
 import { DepartmentFormDialog } from '@/components/admin/department-form-dialog';
 import { DepartmentViewDialog } from '@/components/admin/department-view-dialog';
+import { SubjectTable } from '@/components/admin/subject-table';
+import { SubjectFormDialog } from '@/components/admin/subject-form-dialog';
+import { SubjectViewDialog } from '@/components/admin/subject-view-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Search, Users, UserCheck, UserX, Crown, Building2, CheckCircle2, XCircle } from 'lucide-react';
+import { Plus, Search, Users, UserCheck, UserX, Crown, Building2, CheckCircle2, XCircle, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const dynamic = 'force-dynamic';
@@ -44,6 +55,7 @@ export default function AdminPage() {
   const [activeSection, setActiveSection] = useState('faculty');
   const [faculty, setFaculty] = useState<Faculty[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -59,6 +71,12 @@ export default function AdminPage() {
   const [isDeptViewDialogOpen, setIsDeptViewDialogOpen] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
 
+  // Subject dialogs
+  const [isSubjectAddDialogOpen, setIsSubjectAddDialogOpen] = useState(false);
+  const [isSubjectEditDialogOpen, setIsSubjectEditDialogOpen] = useState(false);
+  const [isSubjectViewDialogOpen, setIsSubjectViewDialogOpen] = useState(false);
+  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
+
   // Statistics
   const totalFaculty = faculty.length;
   const activeFaculty = faculty.filter((f) => f.is_active).length;
@@ -68,6 +86,10 @@ export default function AdminPage() {
   const totalDepartments = departments.length;
   const activeDepartments = departments.filter((d) => d.is_department_active).length;
   const inactiveDepartments = departments.filter((d) => !d.is_department_active).length;
+
+  const totalSubjects = subjects.length;
+  const subjectsWithDept = subjects.filter((s) => s.department_id !== null).length;
+  const subjectsWithoutDept = subjects.filter((s) => s.department_id === null).length;
 
   useEffect(() => {
     if (activeSection === 'faculty') {
@@ -81,6 +103,12 @@ export default function AdminPage() {
       // Load faculty for the HOD names in department table
       if (faculty.length === 0) {
         loadFaculty();
+      }
+    } else if (activeSection === 'subjects') {
+      loadSubjects();
+      // Load departments for the dropdown in subject form
+      if (departments.length === 0) {
+        loadDepartments();
       }
     }
   }, [activeSection]);
@@ -108,6 +136,19 @@ export default function AdminPage() {
     } catch (error) {
       console.error('Error loading departments:', error);
       toast.error('Failed to load departments: ' + (error as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadSubjects = async () => {
+    try {
+      setLoading(true);
+      const data = await getAllSubjects();
+      setSubjects(data);
+    } catch (error) {
+      console.error('Error loading subjects:', error);
+      toast.error('Failed to load subjects');
     } finally {
       setLoading(false);
     }
@@ -375,6 +416,77 @@ Are you absolutely sure you want to proceed?`;
     setIsDeptEditDialogOpen(true);
   };
 
+  // Subject handlers
+  const handleSubjectSearch = async () => {
+    if (!searchQuery.trim()) {
+      loadSubjects();
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const results = await searchSubjects(searchQuery);
+      setSubjects(results);
+      toast.success(`Found ${results.length} subject(s)`);
+    } catch (error) {
+      console.error('Error searching subjects:', error);
+      toast.error('Failed to search subjects');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubjectAdd = async (data: SubjectFormData) => {
+    try {
+      await createSubject(data, current_user);
+      toast.success('Subject added successfully');
+      loadSubjects();
+    } catch (error) {
+      console.error('Error adding subject:', error);
+      toast.error('Failed to add subject: ' + (error as Error).message);
+      throw error;
+    }
+  };
+
+  const handleSubjectEdit = async (data: SubjectFormData) => {
+    if (!selectedSubject) return;
+
+    try {
+      await updateSubject(selectedSubject.unique_subject_id, data);
+      toast.success('Subject updated successfully');
+      loadSubjects();
+    } catch (error) {
+      console.error('Error updating subject:', error);
+      toast.error('Failed to update subject');
+      throw error;
+    }
+  };
+
+  const handleSubjectDelete = async (subject: Subject) => {
+    if (!confirm(`Are you sure you want to delete "${subject.subject_name}"?`)) {
+      return;
+    }
+
+    try {
+      await deleteSubject(subject.unique_subject_id);
+      toast.success('Subject deleted successfully');
+      loadSubjects();
+    } catch (error) {
+      console.error('Error deleting subject:', error);
+      toast.error('Failed to delete subject');
+    }
+  };
+
+  const handleSubjectView = (subject: Subject) => {
+    setSelectedSubject(subject);
+    setIsSubjectViewDialogOpen(true);
+  };
+
+  const handleSubjectEditClick = (subject: Subject) => {
+    setSelectedSubject(subject);
+    setIsSubjectEditDialogOpen(true);
+  };
+
   return (
     <AdminSidebar activeSection={activeSection} onSectionChange={setActiveSection}>
       <div className="space-y-6">
@@ -634,6 +746,127 @@ Are you absolutely sure you want to proceed?`;
             </Card>
           </>
         )}
+
+        {activeSection === 'subjects' && (
+          <>
+            {/* Header */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <h1 className="text-3xl font-bold">Subject Management</h1>
+                <p className="text-muted-foreground">
+                  Manage subjects and their information
+                </p>
+              </div>
+              <Button onClick={() => setIsSubjectAddDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Subject
+              </Button>
+            </div>
+
+            {/* Statistics Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Total Subjects
+                  </CardTitle>
+                  <BookOpen className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{totalSubjects}</div>
+                  <p className="text-xs text-muted-foreground">
+                    All subjects
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    With Department
+                  </CardTitle>
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{subjectsWithDept}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Assigned to departments
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Without Department
+                  </CardTitle>
+                  <XCircle className="h-4 w-4 text-red-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{subjectsWithoutDept}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Not assigned
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Search Bar */}
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                    <Input
+                      placeholder="Search by subject name..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSubjectSearch()}
+                      className="pl-10"
+                    />
+                  </div>
+                  <Button onClick={handleSubjectSearch} disabled={loading}>
+                    <Search className="mr-2 h-4 w-4" />
+                    Search
+                  </Button>
+                  {searchQuery && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setSearchQuery('');
+                        loadSubjects();
+                      }}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Subject Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Subjects</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Loading subjects...
+                  </div>
+                ) : (
+                  <SubjectTable
+                    subjects={subjects}
+                    departments={departments}
+                    onView={handleSubjectView}
+                    onEdit={handleSubjectEditClick}
+                    onDelete={handleSubjectDelete}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* Faculty Dialogs */}
@@ -680,6 +913,31 @@ Are you absolutely sure you want to proceed?`;
         open={isDeptViewDialogOpen}
         onOpenChange={setIsDeptViewDialogOpen}
         department={selectedDepartment}
+      />
+
+      {/* Subject Dialogs */}
+      <SubjectFormDialog
+        open={isSubjectAddDialogOpen}
+        onOpenChange={setIsSubjectAddDialogOpen}
+        onSave={handleSubjectAdd}
+        departments={departments}
+        isEdit={false}
+      />
+
+      <SubjectFormDialog
+        open={isSubjectEditDialogOpen}
+        onOpenChange={setIsSubjectEditDialogOpen}
+        onSave={handleSubjectEdit}
+        subject={selectedSubject}
+        departments={departments}
+        isEdit={true}
+      />
+
+      <SubjectViewDialog
+        open={isSubjectViewDialogOpen}
+        onOpenChange={setIsSubjectViewDialogOpen}
+        subject={selectedSubject}
+        departments={departments}
       />
     </AdminSidebar>
   );
