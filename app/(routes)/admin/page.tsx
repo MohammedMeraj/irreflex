@@ -29,6 +29,7 @@ import {
   updateSubject,
   deleteSubject,
   searchSubjects,
+  bulkAssignSubjectsToDepartment,
 } from '@/lib/subject-service';
 import { AdminSidebar } from '@/components/admin/admin-sidebar';
 import { FacultyTable } from '@/components/admin/faculty-table';
@@ -76,6 +77,7 @@ export default function AdminPage() {
   const [isSubjectEditDialogOpen, setIsSubjectEditDialogOpen] = useState(false);
   const [isSubjectViewDialogOpen, setIsSubjectViewDialogOpen] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState<number[]>([]);
 
   // Statistics
   const totalFaculty = faculty.length;
@@ -536,6 +538,32 @@ Are you absolutely sure you want to proceed?`;
     setIsSubjectEditDialogOpen(true);
   };
 
+  const handleBulkAssignDepartment = async (departmentId: number | null) => {
+    if (selectedSubjectIds.length === 0) {
+      toast.error('Please select at least one subject');
+      return;
+    }
+
+    const action = departmentId === null ? 'unassign' : 'assign';
+    const deptName = departmentId 
+      ? departments.find(d => d.department_id === departmentId)?.department_name 
+      : 'No Department';
+
+    if (!confirm(`Are you sure you want to ${action} ${selectedSubjectIds.length} subject(s) ${departmentId ? `to "${deptName}"` : 'from their department'}?`)) {
+      return;
+    }
+
+    try {
+      await bulkAssignSubjectsToDepartment(selectedSubjectIds, departmentId);
+      toast.success(`Successfully ${action}ed ${selectedSubjectIds.length} subject(s)`);
+      setSelectedSubjectIds([]);
+      loadSubjects();
+    } catch (error) {
+      console.error('Error assigning subjects:', error);
+      toast.error(`Failed to ${action} subjects`);
+    }
+  };
+
   return (
     <AdminSidebar activeSection={activeSection} onSectionChange={setActiveSection}>
       <div className="space-y-6">
@@ -893,6 +921,51 @@ Are you absolutely sure you want to proceed?`;
               </CardContent>
             </Card>
 
+            {/* Bulk Actions */}
+            {selectedSubjectIds.length > 0 && (
+              <Card className="border-primary">
+                <CardContent className="pt-6">
+                  <div className="flex flex-col md:flex-row items-center gap-4">
+                    <div className="flex-1">
+                      <p className="font-medium">
+                        {selectedSubjectIds.length} subject{selectedSubjectIds.length > 1 ? 's' : ''} selected
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Assign or unassign selected subjects to/from departments
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <select
+                        className="px-3 py-2 border rounded-md text-sm"
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value) {
+                            handleBulkAssignDepartment(value === 'none' ? null : parseInt(value));
+                            e.target.value = '';
+                          }
+                        }}
+                        defaultValue=""
+                      >
+                        <option value="" disabled>Select Department</option>
+                        {departments.map((dept) => (
+                          <option key={dept.department_id} value={dept.department_id}>
+                            {dept.department_name}
+                          </option>
+                        ))}
+                        <option value="none">Unassign from Department</option>
+                      </select>
+                      <Button
+                        variant="outline"
+                        onClick={() => setSelectedSubjectIds([])}
+                      >
+                        Clear Selection
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Subject Table */}
             <Card>
               <CardHeader>
@@ -910,6 +983,8 @@ Are you absolutely sure you want to proceed?`;
                     onView={handleSubjectView}
                     onEdit={handleSubjectEditClick}
                     onDelete={handleSubjectDelete}
+                    selectedSubjects={selectedSubjectIds}
+                    onSelectionChange={setSelectedSubjectIds}
                   />
                 )}
               </CardContent>

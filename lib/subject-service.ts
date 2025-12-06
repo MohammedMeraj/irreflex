@@ -93,3 +93,13 @@ export async function searchSubjects(searchTerm: string): Promise<Subject[]> {
   if (error) throw error;
   return data || [];
 }
+
+// Bulk assign subjects to department
+export async function bulkAssignSubjectsToDepartment(subjectIds: number[], departmentId: number | null): Promise<void> {
+  const { error } = await supabase
+    .from('subject')
+    .update({ department_id: departmentId })
+    .in('unique_subject_id', subjectIds);
+
+  if (error) throw error;
+}

@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Edit,
   Trash2,
@@ -26,6 +27,8 @@ interface SubjectTableProps {
   onEdit: (subject: Subject) => void;
   onDelete: (subject: Subject) => void;
   onView: (subject: Subject) => void;
+  selectedSubjects?: number[];
+  onSelectionChange?: (subjectIds: number[]) => void;
 }
 
 export function SubjectTable({
@@ -34,6 +37,8 @@ export function SubjectTable({
   onEdit,
   onDelete,
   onView,
+  selectedSubjects = [],
+  onSelectionChange,
 }: SubjectTableProps) {
   const getDepartmentName = (deptId: number | null) => {
     if (!deptId) return 'No Department';
@@ -50,6 +55,27 @@ export function SubjectTable({
     });
   };
 
+  const handleSelectAll = (checked: boolean) => {
+    if (!onSelectionChange) return;
+    if (checked) {
+      onSelectionChange(subjects.map(s => s.unique_subject_id));
+    } else {
+      onSelectionChange([]);
+    }
+  };
+
+  const handleSelectSubject = (subjectId: number, checked: boolean) => {
+    if (!onSelectionChange) return;
+    if (checked) {
+      onSelectionChange([...selectedSubjects, subjectId]);
+    } else {
+      onSelectionChange(selectedSubjects.filter(id => id !== subjectId));
+    }
+  };
+
+  const isAllSelected = subjects.length > 0 && selectedSubjects.length === subjects.length;
+  const isSomeSelected = selectedSubjects.length > 0 && selectedSubjects.length < subjects.length;
+
   if (subjects.length === 0) {
     return (
       <div className="text-center py-12 border rounded-lg">
@@ -64,7 +90,16 @@ export function SubjectTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>ID</TableHead>
+              {onSelectionChange && (
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={isAllSelected}
+                    onCheckedChange={handleSelectAll}
+                    aria-label="Select all subjects"
+                    className={isSomeSelected ? 'data-[state=checked]:bg-primary/50' : ''}
+                  />
+                </TableHead>
+              )}
               <TableHead>Subject Name</TableHead>
               <TableHead>Department</TableHead>
               <TableHead>Credits</TableHead>
@@ -76,7 +111,15 @@ export function SubjectTable({
           <TableBody>
             {subjects.map((subject) => (
               <TableRow key={subject.unique_subject_id}>
-                <TableCell className="font-medium">{subject.unique_subject_id}</TableCell>
+                {onSelectionChange && (
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedSubjects.includes(subject.unique_subject_id)}
+                      onCheckedChange={(checked) => handleSelectSubject(subject.unique_subject_id, checked as boolean)}
+                      aria-label={`Select ${subject.subject_name}`}
+                    />
+                  </TableCell>
+                )}
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
