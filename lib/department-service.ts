@@ -191,6 +191,30 @@ export async function updateDepartment(id: number, departmentData: Partial<Depar
 
 // Delete department
 export async function deleteDepartment(id: number): Promise<void> {
+  // First check if any faculty members are assigned to this department
+  const { data: departmentData, error: deptFetchError } = await supabase
+    .from('department')
+    .select('department_name')
+    .eq('department_id', id)
+    .single();
+
+  if (deptFetchError) throw deptFetchError;
+
+  const departmentName = departmentData?.department_name;
+
+  // Check if any faculty has this department assigned
+  const { data: facultyWithDept, error: facultyCheckError } = await supabase
+    .from('faculty')
+    .select('unique_id, faculty_first_name, faculty_last_name')
+    .eq('faculty_department', departmentName);
+
+  if (facultyCheckError) throw facultyCheckError;
+
+  // If any faculty members are assigned to this department, prevent deletion
+  if (facultyWithDept && facultyWithDept.length > 0) {
+    throw new Error(`Cannot delete department "${departmentName}". ${facultyWithDept.length} faculty member(s) are currently assigned to this department. Please reassign or remove these faculty members first.`);
+  }
+
   // Get the department to check if it has an HOD
   const { data: dept, error: fetchError } = await supabase
     .from('department')

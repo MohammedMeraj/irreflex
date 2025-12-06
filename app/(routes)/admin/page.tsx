@@ -430,7 +430,9 @@ Are you absolutely sure you want to proceed?`;
       }
     } catch (error) {
       console.error('Error deleting department:', error);
-      toast.error('Failed to delete department');
+      const errorMessage = (error as Error).message;
+      // Display the full error message which includes faculty count details
+      toast.error(errorMessage || 'Failed to delete department');
     }
   };
 

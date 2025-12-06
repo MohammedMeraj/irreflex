@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Department, DepartmentFormData } from '@/types/department';
 import { Faculty } from '@/types/faculty';
-import { getAvailableHODs } from '@/lib/faculty-service';
+import { getAvailableHODs, getFacultyById } from '@/lib/faculty-service';
 import {
   Dialog,
   DialogContent,
@@ -40,6 +40,7 @@ export function DepartmentFormDialog({
 }: DepartmentFormDialogProps) {
   const [loading, setLoading] = useState(false);
   const [availableHODs, setAvailableHODs] = useState<Faculty[]>([]);
+  const [currentHOD, setCurrentHOD] = useState<Faculty | null>(null);
   const [loadingHODs, setLoadingHODs] = useState(false);
   const [formData, setFormData] = useState<DepartmentFormData>({
     department_name: '',
@@ -60,18 +61,24 @@ export function DepartmentFormDialog({
       setLoadingHODs(true);
       const hods = await getAvailableHODs();
       
-      // If editing and current department has a HOD, include them in the list
+      // If editing and current department has a HOD, fetch their details
       if (isEdit && department?.department_hod_id) {
-        // Check if current HOD is not in the available list
-        const hasCurrentHOD = hods.some(h => h.unique_id === department.department_hod_id);
-        if (!hasCurrentHOD) {
-          // We need to fetch the current HOD details and add to list
-          // For now, just use the available HODs
-          setAvailableHODs(hods);
-        } else {
+        try {
+          const hodDetails = await getFacultyById(department.department_hod_id);
+          setCurrentHOD(hodDetails);
+          // Add current HOD to the list if not already present
+          const hasCurrentHOD = hods.some(h => h.unique_id === department.department_hod_id);
+          if (!hasCurrentHOD) {
+            setAvailableHODs([hodDetails, ...hods]);
+          } else {
+            setAvailableHODs(hods);
+          }
+        } catch (error) {
+          console.error('Error fetching current HOD:', error);
           setAvailableHODs(hods);
         }
       } else {
+        setCurrentHOD(null);
         setAvailableHODs(hods);
       }
     } catch (error) {
@@ -180,12 +187,15 @@ export function DepartmentFormDialog({
                     {availableHODs.map((hod) => (
                       <SelectItem key={hod.unique_id} value={hod.unique_id.toString()}>
                         {hod.faculty_first_name} {hod.faculty_last_name} (ID: {hod.unique_id})
+                        {currentHOD && currentHOD.unique_id === hod.unique_id && ' ✓'}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Only shows faculty not currently assigned as HOD
+                  {isEdit && currentHOD 
+                    ? `Current HOD: ${currentHOD.faculty_first_name} ${currentHOD.faculty_last_name}` 
+                    : 'Only shows faculty not currently assigned as HOD'}
                 </p>
               </div>
             </div>
