@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Department } from '@/types/department';
+import { Faculty } from '@/types/faculty';
 import {
   Dialog,
   DialogContent,
@@ -23,14 +24,21 @@ interface DepartmentViewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   department: Department | null;
+  faculty?: Faculty[];
 }
 
 export function DepartmentViewDialog({
   open,
   onOpenChange,
   department,
+  faculty = [],
 }: DepartmentViewDialogProps) {
   if (!department) return null;
+
+  // Find HOD details
+  const hodDetails = department.department_hod_id 
+    ? faculty.find(f => f.unique_id === department.department_hod_id)
+    : null;
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Never';
@@ -96,9 +104,21 @@ export function DepartmentViewDialog({
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <p className="text-sm text-muted-foreground">HOD Faculty ID</p>
-                {department.department_hod_id ? (
-                  <Badge variant="outline">Faculty #{department.department_hod_id}</Badge>
+                <p className="text-sm text-muted-foreground">HOD Name</p>
+                {hodDetails ? (
+                  <div>
+                    <p className="font-medium">
+                      {hodDetails.faculty_first_name} {hodDetails.faculty_last_name}
+                    </p>
+                    <Badge variant="outline" className="mt-1">
+                      Faculty ID: {department.department_hod_id}
+                    </Badge>
+                  </div>
+                ) : department.department_hod_id ? (
+                  <div>
+                    <Badge variant="outline">Faculty ID: {department.department_hod_id}</Badge>
+                    <p className="text-xs text-muted-foreground mt-1">Details not available</p>
+                  </div>
                 ) : (
                   <p className="font-medium text-muted-foreground">Not assigned</p>
                 )}

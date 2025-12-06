@@ -962,6 +962,7 @@ Are you absolutely sure you want to proceed?`;
         open={isDeptViewDialogOpen}
         onOpenChange={setIsDeptViewDialogOpen}
         department={selectedDepartment}
+        faculty={faculty}
       />
 
       {/* Subject Dialogs */}
