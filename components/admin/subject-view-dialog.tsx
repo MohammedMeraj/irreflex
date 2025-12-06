@@ -75,10 +75,6 @@ export function SubjectViewDialog({
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <p className="text-sm text-muted-foreground">Subject ID</p>
-                <p className="font-medium">{subject.unique_subject_id}</p>
-              </div>
-              <div>
                 <p className="text-sm text-muted-foreground">Subject Name</p>
                 <p className="font-medium">{subject.subject_name}</p>
               </div>

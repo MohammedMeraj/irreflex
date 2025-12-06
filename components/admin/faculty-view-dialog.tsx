@@ -75,10 +75,6 @@ export function FacultyViewDialog({
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <p className="text-sm text-muted-foreground">Faculty ID</p>
-                <p className="font-medium">{faculty.unique_id}</p>
-              </div>
-              <div>
                 <p className="text-sm text-muted-foreground">Full Name</p>
                 <p className="font-medium">
                   {faculty.faculty_first_name} {faculty.faculty_last_name}

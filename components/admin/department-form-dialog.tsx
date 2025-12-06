@@ -186,7 +186,7 @@ export function DepartmentFormDialog({
                     <SelectItem value="none">No HOD</SelectItem>
                     {availableHODs.map((hod) => (
                       <SelectItem key={hod.unique_id} value={hod.unique_id.toString()}>
-                        {hod.faculty_first_name} {hod.faculty_last_name} (ID: {hod.unique_id})
+                        {hod.faculty_first_name} {hod.faculty_last_name}
                         {currentHOD && currentHOD.unique_id === hod.unique_id && ' ✓'}
                       </SelectItem>
                     ))}

@@ -74,10 +74,6 @@ export function DepartmentViewDialog({
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <p className="text-sm text-muted-foreground">Department ID</p>
-                <p className="font-medium">{department.department_id}</p>
-              </div>
-              <div>
                 <p className="text-sm text-muted-foreground">Department Name</p>
                 <p className="font-medium">{department.department_name}</p>
               </div>
@@ -106,19 +102,11 @@ export function DepartmentViewDialog({
               <div>
                 <p className="text-sm text-muted-foreground">HOD Name</p>
                 {hodDetails ? (
-                  <div>
-                    <p className="font-medium">
-                      {hodDetails.faculty_first_name} {hodDetails.faculty_last_name}
-                    </p>
-                    <Badge variant="outline" className="mt-1">
-                      Faculty ID: {department.department_hod_id}
-                    </Badge>
-                  </div>
+                  <p className="font-medium">
+                    {hodDetails.faculty_first_name} {hodDetails.faculty_last_name}
+                  </p>
                 ) : department.department_hod_id ? (
-                  <div>
-                    <Badge variant="outline">Faculty ID: {department.department_hod_id}</Badge>
-                    <p className="text-xs text-muted-foreground mt-1">Details not available</p>
-                  </div>
+                  <p className="font-medium text-muted-foreground">Details not available</p>
                 ) : (
                   <p className="font-medium text-muted-foreground">Not assigned</p>
                 )}
