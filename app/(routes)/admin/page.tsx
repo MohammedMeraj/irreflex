@@ -200,14 +200,61 @@ export default function AdminPage() {
   };
 
   const handleDelete = async (faculty: Faculty) => {
-    if (!confirm(`Are you sure you want to delete ${faculty.faculty_first_name} ${faculty.faculty_last_name}?`)) {
-      return;
+    // Check if faculty is HOD
+    if (faculty.is_hod) {
+      // Get the department this faculty is HOD of
+      const department = await getDepartmentByHODId(faculty.unique_id);
+      
+      if (department) {
+        const warningMessage = `⚠️ SERIOUS WARNING ⚠️
+
+${faculty.faculty_first_name} ${faculty.faculty_last_name} is currently the HOD of "${department.department_name}".
+
+Deleting this faculty will:
+
+1. Remove them as HOD from "${department.department_name}"
+2. DEACTIVATE the department "${department.department_name}"
+3. Remove all HOD assignments from the Department table
+4. PERMANENTLY DELETE the faculty member
+5. This action CANNOT be undone
+
+Department: ${department.department_name}
+Current Status: ${department.is_department_active ? 'Active' : 'Inactive'}
+
+Are you absolutely sure you want to proceed with deletion?`;
+
+        if (!confirm(warningMessage)) {
+          return;
+        }
+      } else {
+        // Faculty is marked as HOD but no department found (data inconsistency)
+        const warningMessage = `⚠️ WARNING ⚠️
+
+${faculty.faculty_first_name} ${faculty.faculty_last_name} is marked as HOD but no department assignment found.
+
+Deleting this faculty will permanently remove them from the system.
+
+Are you sure you want to proceed?`;
+
+        if (!confirm(warningMessage)) {
+          return;
+        }
+      }
+    } else {
+      // Regular faculty deletion confirmation
+      if (!confirm(`Are you sure you want to delete ${faculty.faculty_first_name} ${faculty.faculty_last_name}?`)) {
+        return;
+      }
     }
 
     try {
       await deleteFaculty(faculty.unique_id);
-      toast.success('Faculty member deleted successfully');
+      toast.success('Faculty member deleted successfully' + (faculty.is_hod ? ' and removed as HOD from department' : ''));
       loadFaculty();
+      // Reload departments if faculty was HOD
+      if (faculty.is_hod) {
+        loadDepartments();
+      }
     } catch (error) {
       console.error('Error deleting faculty:', error);
       toast.error('Failed to delete faculty member');

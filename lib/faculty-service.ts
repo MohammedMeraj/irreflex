@@ -64,6 +64,28 @@ export async function updateFaculty(id: number, facultyData: Partial<FacultyForm
 
 // Delete faculty
 export async function deleteFaculty(id: number): Promise<void> {
+  // First, check if this faculty is HOD of any department and remove them
+  const { data: departments, error: deptError } = await supabase
+    .from('department')
+    .select('*')
+    .eq('department_hod_id', id);
+
+  if (deptError) throw deptError;
+
+  // If faculty is HOD of any department, remove them and deactivate those departments
+  if (departments && departments.length > 0) {
+    const { error: updateError } = await supabase
+      .from('department')
+      .update({
+        department_hod_id: null,
+        is_department_active: false
+      })
+      .eq('department_hod_id', id);
+
+    if (updateError) throw updateError;
+  }
+
+  // Now delete the faculty
   const { error } = await supabase
     .from('faculty')
     .delete()
