@@ -46,7 +46,7 @@ export function DepartmentFormDialog({
     department_name: '',
     establish_year: null,
     department_hod_id: null,
-    is_department_active: true,
+    is_department_active: false,
   });
 
   // Load available HODs when dialog opens
@@ -102,7 +102,7 @@ export function DepartmentFormDialog({
         department_name: '',
         establish_year: null,
         department_hod_id: null,
-        is_department_active: true,
+        is_department_active: false,
       });
     }
   }, [department, isEdit, open]);
@@ -216,6 +216,9 @@ export function DepartmentFormDialog({
                   <SelectItem value="inactive">Inactive</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Note: Department can only be activated if a HOD is assigned
+              </p>
             </div>
           </div>
 
