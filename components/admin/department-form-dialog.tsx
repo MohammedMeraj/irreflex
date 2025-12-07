@@ -29,6 +29,7 @@ interface DepartmentFormDialogProps {
   department?: Department | null;
   onSave: (data: DepartmentFormData) => Promise<void>;
   isEdit?: boolean;
+  currentUser?: string;
 }
 
 export function DepartmentFormDialog({
@@ -37,6 +38,7 @@ export function DepartmentFormDialog({
   department,
   onSave,
   isEdit = false,
+  currentUser,
 }: DepartmentFormDialogProps) {
   const [loading, setLoading] = useState(false);
   const [availableHODs, setAvailableHODs] = useState<Faculty[]>([]);
@@ -59,7 +61,7 @@ export function DepartmentFormDialog({
   const loadAvailableHODs = async () => {
     try {
       setLoadingHODs(true);
-      const hods = await getAvailableHODs();
+      const hods = await getAvailableHODs(currentUser);
       
       // If editing and current department has a HOD, fetch their details
       if (isEdit && department?.department_hod_id) {

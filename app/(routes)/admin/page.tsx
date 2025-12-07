@@ -50,7 +50,7 @@ import { toast } from 'sonner';
 export const dynamic = 'force-dynamic';
 
 // Current admin user email (hardcoded as per requirements)
-const current_user = 'mdmomin7517@gmail.com';
+const current_user = 'admin2@gmail.com';
 
 export default function AdminPage() {
   const [activeSection, setActiveSection] = useState('faculty');
@@ -118,7 +118,7 @@ export default function AdminPage() {
   const loadFaculty = async () => {
     try {
       setLoading(true);
-      const data = await getAllFaculty();
+      const data = await getAllFaculty(current_user);
       setFaculty(data);
     } catch (error) {
       console.error('Error loading faculty:', error);
@@ -132,7 +132,7 @@ export default function AdminPage() {
     try {
       setLoading(true);
       console.log('Loading departments...');
-      const data = await getAllDepartments();
+      const data = await getAllDepartments(current_user);
       console.log('Departments loaded:', data);
       setDepartments(data);
     } catch (error) {
@@ -146,7 +146,7 @@ export default function AdminPage() {
   const loadSubjects = async () => {
     try {
       setLoading(true);
-      const data = await getAllSubjects();
+      const data = await getAllSubjects(current_user);
       setSubjects(data);
     } catch (error) {
       console.error('Error loading subjects:', error);
@@ -164,7 +164,7 @@ export default function AdminPage() {
 
     try {
       setLoading(true);
-      const results = await searchFaculty(searchQuery);
+      const results = await searchFaculty(searchQuery, current_user);
       setFaculty(results);
       toast.success(`Found ${results.length} faculty member(s)`);
     } catch (error) {
@@ -361,7 +361,7 @@ Are you absolutely sure you want to proceed?`;
 
     try {
       setLoading(true);
-      const results = await searchDepartments(searchQuery);
+      const results = await searchDepartments(searchQuery, current_user);
       setDepartments(results);
       toast.success(`Found ${results.length} department(s)`);
     } catch (error) {
@@ -476,7 +476,7 @@ Are you absolutely sure you want to proceed?`;
 
     try {
       setLoading(true);
-      const results = await searchSubjects(searchQuery);
+      const results = await searchSubjects(searchQuery, current_user);
       setSubjects(results);
       toast.success(`Found ${results.length} subject(s)`);
     } catch (error) {
@@ -1023,6 +1023,7 @@ Are you absolutely sure you want to proceed?`;
         onOpenChange={setIsDeptAddDialogOpen}
         onSave={handleDepartmentAdd}
         isEdit={false}
+        currentUser={current_user}
       />
 
       <DepartmentFormDialog
@@ -1031,6 +1032,7 @@ Are you absolutely sure you want to proceed?`;
         department={selectedDepartment}
         onSave={handleDepartmentEdit}
         isEdit={true}
+        currentUser={current_user}
       />
 
       <DepartmentViewDialog

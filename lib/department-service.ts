@@ -3,12 +3,18 @@ import { Department, DepartmentFormData } from '@/types/department';
 import { promoteToHOD } from './faculty-service';
 
 // Get all departments
-export async function getAllDepartments(): Promise<Department[]> {
+export async function getAllDepartments(adminEmail?: string): Promise<Department[]> {
   console.log('Fetching departments from Supabase...');
-  const { data, error } = await supabase
+  let query = supabase
     .from('department')
-    .select('*')
-    .order('department_id', { ascending: false });
+    .select('*');
+  
+  // Filter by admin email if provided
+  if (adminEmail) {
+    query = query.eq('admin_email', adminEmail);
+  }
+  
+  const { data, error } = await query.order('department_id', { ascending: false });
 
   if (error) {
     console.error('Supabase error:', error);
@@ -260,12 +266,18 @@ export async function toggleDepartmentActiveStatus(id: number, isActive: boolean
 }
 
 // Search departments
-export async function searchDepartments(searchTerm: string): Promise<Department[]> {
-  const { data, error } = await supabase
+export async function searchDepartments(searchTerm: string, adminEmail?: string): Promise<Department[]> {
+  let query = supabase
     .from('department')
     .select('*')
-    .or(`department_name.ilike.%${searchTerm}%,admin_email.ilike.%${searchTerm}%`)
-    .order('department_id', { ascending: false });
+    .or(`department_name.ilike.%${searchTerm}%,admin_email.ilike.%${searchTerm}%`);
+  
+  // Filter by admin email if provided
+  if (adminEmail) {
+    query = query.eq('admin_email', adminEmail);
+  }
+  
+  const { data, error } = await query.order('department_id', { ascending: false });
 
   if (error) throw error;
   return data || [];

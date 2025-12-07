@@ -2,11 +2,17 @@ import { supabase } from './supabase';
 import { Faculty, FacultyFormData } from '@/types/faculty';
 
 // Get all faculty
-export async function getAllFaculty(): Promise<Faculty[]> {
-  const { data, error } = await supabase
+export async function getAllFaculty(adminEmail?: string): Promise<Faculty[]> {
+  let query = supabase
     .from('faculty')
-    .select('*')
-    .order('unique_id', { ascending: false });
+    .select('*');
+  
+  // Filter by admin email if provided
+  if (adminEmail) {
+    query = query.eq('admin_email', adminEmail);
+  }
+  
+  const { data, error } = await query.order('unique_id', { ascending: false });
 
   if (error) throw error;
   return data || [];
@@ -121,33 +127,52 @@ export async function promoteToHOD(id: number, isHOD: boolean): Promise<Faculty>
 }
 
 // Search faculty
-export async function searchFaculty(searchTerm: string): Promise<Faculty[]> {
-  const { data, error } = await supabase
+export async function searchFaculty(searchTerm: string, adminEmail?: string): Promise<Faculty[]> {
+  let query = supabase
     .from('faculty')
     .select('*')
-    .or(`faculty_email.ilike.%${searchTerm}%,faculty_first_name.ilike.%${searchTerm}%,faculty_last_name.ilike.%${searchTerm}%,faculty_department.ilike.%${searchTerm}%`)
-    .order('unique_id', { ascending: false });
+    .or(`faculty_email.ilike.%${searchTerm}%,faculty_first_name.ilike.%${searchTerm}%,faculty_last_name.ilike.%${searchTerm}%,faculty_department.ilike.%${searchTerm}%`);
+  
+  // Filter by admin email if provided
+  if (adminEmail) {
+    query = query.eq('admin_email', adminEmail);
+  }
+  
+  const { data, error } = await query.order('unique_id', { ascending: false });
 
   if (error) throw error;
   return data || [];
 }
 
 // Get available HODs (faculty not assigned as HOD to any department)
-export async function getAvailableHODs(): Promise<Faculty[]> {
+export async function getAvailableHODs(adminEmail?: string): Promise<Faculty[]> {
   // First get all faculty who are active
-  const { data: allFaculty, error: facultyError } = await supabase
+  let query = supabase
     .from('faculty')
     .select('*')
-    .eq('is_active', true)
-    .order('faculty_first_name', { ascending: true });
+    .eq('is_active', true);
+  
+  // Filter by admin email if provided
+  if (adminEmail) {
+    query = query.eq('admin_email', adminEmail);
+  }
+  
+  const { data: allFaculty, error: facultyError } = await query.order('faculty_first_name', { ascending: true });
 
   if (facultyError) throw facultyError;
 
   // Get all departments with HODs assigned
-  const { data: departments, error: deptError } = await supabase
+  let deptQuery = supabase
     .from('department')
     .select('department_hod_id')
     .not('department_hod_id', 'is', null);
+  
+  // Filter departments by admin email if provided
+  if (adminEmail) {
+    deptQuery = deptQuery.eq('admin_email', adminEmail);
+  }
+  
+  const { data: departments, error: deptError } = await deptQuery;
 
   if (deptError) throw deptError;
 

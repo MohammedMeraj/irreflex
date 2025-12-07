@@ -2,11 +2,17 @@ import { supabase } from './supabase';
 import { Subject, SubjectFormData } from '@/types/subject';
 
 // Get all subjects
-export async function getAllSubjects(): Promise<Subject[]> {
-  const { data, error } = await supabase
+export async function getAllSubjects(adminEmail?: string): Promise<Subject[]> {
+  let query = supabase
     .from('subject')
-    .select('*')
-    .order('unique_subject_id', { ascending: false });
+    .select('*');
+  
+  // Filter by admin email if provided
+  if (adminEmail) {
+    query = query.eq('admin_email', adminEmail);
+  }
+  
+  const { data, error } = await query.order('unique_subject_id', { ascending: false });
 
   if (error) throw error;
   return data || [];
@@ -83,12 +89,18 @@ export async function deleteSubject(id: number): Promise<void> {
 }
 
 // Search subjects
-export async function searchSubjects(searchTerm: string): Promise<Subject[]> {
-  const { data, error } = await supabase
+export async function searchSubjects(searchTerm: string, adminEmail?: string): Promise<Subject[]> {
+  let query = supabase
     .from('subject')
     .select('*')
-    .ilike('subject_name', `%${searchTerm}%`)
-    .order('unique_subject_id', { ascending: false });
+    .ilike('subject_name', `%${searchTerm}%`);
+  
+  // Filter by admin email if provided
+  if (adminEmail) {
+    query = query.eq('admin_email', adminEmail);
+  }
+  
+  const { data, error } = await query.order('unique_subject_id', { ascending: false });
 
   if (error) throw error;
   return data || [];
