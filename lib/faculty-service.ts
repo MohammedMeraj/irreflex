@@ -37,6 +37,8 @@ export async function createFaculty(facultyData: FacultyFormData, adminEmail: st
     admin_email: adminEmail,
     faculty_phone: facultyData.faculty_phone || null,
     faculty_gender: facultyData.faculty_gender || null,
+    // Faculty cannot be active if not assigned to a department
+    is_active: (facultyData.faculty_department && facultyData.faculty_department !== 'No Department') ? true : false,
   };
 
   const { data, error } = await supabase
@@ -56,6 +58,11 @@ export async function updateFaculty(id: number, facultyData: Partial<FacultyForm
   // Clean up empty strings
   if (updateData.faculty_phone === '') updateData.faculty_phone = null;
   if (updateData.faculty_gender === '') updateData.faculty_gender = null;
+
+  // If department is being changed to 'No Department' or empty, set is_active to false
+  if (updateData.faculty_department === 'No Department' || !updateData.faculty_department) {
+    updateData.is_active = false;
+  }
 
   const { data, error } = await supabase
     .from('faculty')
@@ -102,6 +109,22 @@ export async function deleteFaculty(id: number): Promise<void> {
 
 // Toggle faculty active status
 export async function toggleActiveStatus(id: number, isActive: boolean): Promise<Faculty> {
+  // If trying to activate, check if faculty has a department assigned
+  if (isActive) {
+    const { data: faculty, error: fetchError } = await supabase
+      .from('faculty')
+      .select('faculty_department')
+      .eq('unique_id', id)
+      .single();
+
+    if (fetchError) throw fetchError;
+    
+    // Prevent activation if faculty is not assigned to a department
+    if (!faculty.faculty_department || faculty.faculty_department === 'No Department') {
+      throw new Error('Faculty cannot be activated without being assigned to a department');
+    }
+  }
+
   const { data, error } = await supabase
     .from('faculty')
     .update({ is_active: isActive })

@@ -272,7 +272,7 @@ Are you sure you want to proceed?`;
       loadFaculty();
     } catch (error) {
       console.error('Error toggling faculty status:', error);
-      toast.error('Failed to toggle faculty status');
+      toast.error('Unassigned Faculty cannot be active, Please assign a department first');
     }
   };
 
