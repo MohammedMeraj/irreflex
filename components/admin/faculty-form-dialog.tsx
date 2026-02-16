@@ -137,6 +137,7 @@ export function FacultyFormDialog({
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="No Department">No Department (Unassigned)</SelectItem>
                     {departments.map((dept) => (
                       <SelectItem key={dept.department_id} value={dept.department_name}>
                         {dept.department_name}
