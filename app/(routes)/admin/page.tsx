@@ -12,6 +12,7 @@ import {
   toggleActiveStatus,
   promoteToHOD,
   searchFaculty,
+  replaceHOD,
 } from '@/lib/faculty-service';
 import {
   getAllDepartments,
@@ -35,6 +36,7 @@ import { AdminSidebar } from '@/components/admin/admin-sidebar';
 import { FacultyTable } from '@/components/admin/faculty-table';
 import { FacultyFormDialog } from '@/components/admin/faculty-form-dialog';
 import { FacultyViewDialog } from '@/components/admin/faculty-view-dialog';
+import { HODReplacementDialog } from '@/components/admin/hod-replacement-dialog';
 import { DepartmentTable } from '@/components/admin/department-table';
 import { DepartmentFormDialog } from '@/components/admin/department-form-dialog';
 import { DepartmentViewDialog } from '@/components/admin/department-view-dialog';
@@ -65,6 +67,8 @@ export default function AdminPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [selectedFaculty, setSelectedFaculty] = useState<Faculty | null>(null);
+  const [isHODReplacementDialogOpen, setIsHODReplacementDialogOpen] = useState(false);
+  const [hodToReplace, setHodToReplace] = useState<Faculty | null>(null);
 
   // Department dialogs
   const [isDeptAddDialogOpen, setIsDeptAddDialogOpen] = useState(false);
@@ -264,6 +268,13 @@ Are you sure you want to proceed?`;
   };
 
   const handleToggleActive = async (faculty: Faculty) => {
+    // If trying to deactivate a HOD, show replacement dialog
+    if (faculty.is_active && faculty.is_hod) {
+      setHodToReplace(faculty);
+      setIsHODReplacementDialogOpen(true);
+      return;
+    }
+
     try {
       await toggleActiveStatus(faculty.unique_id, !faculty.is_active);
       toast.success(
@@ -276,69 +287,50 @@ Are you sure you want to proceed?`;
     }
   };
 
+  const handleHODReplacement = async (newHODId: number | null, keepDepartmentActive: boolean) => {
+    if (!hodToReplace) return;
+
+    try {
+      // Determine if this is a deactivation (from toggle) or demotion (from demote button)
+      const isDeactivation = hodToReplace.is_active;
+      
+      await replaceHOD(
+        hodToReplace.unique_id, 
+        newHODId, 
+        keepDepartmentActive,
+        isDeactivation // deactivate the old HOD if this was triggered from the toggle button
+      );
+      
+      if (keepDepartmentActive && newHODId) {
+        toast.success('HOD replaced successfully. Previous HOD has been ' + (isDeactivation ? 'deactivated' : 'demoted') + '.');
+      } else {
+        toast.success('HOD demoted successfully. Department has been deactivated.');
+      }
+      
+      loadFaculty();
+      loadDepartments();
+      setHodToReplace(null);
+    } catch (error) {
+      console.error('Error replacing HOD:', error);
+      toast.error('Failed to replace HOD: ' + (error as Error).message);
+      throw error;
+    }
+  };
+
   const handlePromoteToHOD = async (faculty: Faculty) => {
     const newStatus = !faculty.is_hod;
-    const action = newStatus ? 'promote' : 'demote';
-    const actionText = newStatus ? 'Promote' : 'Demote';
     
-    // If demoting, check if faculty is HOD of a department and show serious warning
+    // If demoting, show the replacement dialog
     if (!newStatus && faculty.is_hod) {
-      // Get the department this faculty is HOD of
-      const department = await getDepartmentByHODId(faculty.unique_id);
-      
-      if (department) {
-        const warningMessage = `⚠️ SERIOUS WARNING ⚠️
-
-Demoting ${faculty.faculty_first_name} ${faculty.faculty_last_name} as HOD will:
-
-1. Remove them as HOD from "${department.department_name}"
-2. DEACTIVATE the department "${department.department_name}"
-3. Update both Faculty and Department tables
-4. This action cannot be easily undone
-
-Department: ${department.department_name}
-Current Status: ${department.is_department_active ? 'Active' : 'Inactive'}
-
-Are you absolutely sure you want to proceed?`;
-
-        if (!confirm(warningMessage)) {
-          return;
-        }
-
-        // Perform the demotion with department deactivation
-        try {
-          // This function now updates both faculty.is_hod and department tables
-          await removeHODAndDeactivateDepartment(faculty.unique_id);
-          
-          toast.success(`Faculty demoted from HOD and department "${department.department_name}" has been deactivated`);
-          loadFaculty();
-          loadDepartments();
-        } catch (error) {
-          console.error('Error demoting HOD:', error);
-          toast.error('Failed to demote faculty from HOD');
-        }
-        return;
-      }
+      setHodToReplace(faculty);
+      setIsHODReplacementDialogOpen(true);
+      return;
     }
     
     // Normal promote action - but HOD can only be assigned through department management
     if (newStatus) {
       toast.error('Faculty can only be promoted to HOD by assigning them as HOD in Department Management section');
       return;
-    }
-
-    // If somehow trying to demote without department (shouldn't happen)
-    if (!confirm(`${actionText} ${faculty.faculty_first_name} ${faculty.faculty_last_name} ${newStatus ? 'to' : 'from'} HOD?`)) {
-      return;
-    }
-
-    try {
-      await promoteToHOD(faculty.unique_id, newStatus);
-      toast.success(`Faculty member ${action}d ${newStatus ? 'to' : 'from'} HOD successfully`);
-      loadFaculty();
-    } catch (error) {
-      console.error(`Error ${action}ing HOD:`, error);
-      toast.error(`Failed to ${action} faculty ${newStatus ? 'to' : 'from'} HOD`);
     }
   };
 
@@ -1015,6 +1007,15 @@ Are you absolutely sure you want to proceed?`;
         open={isViewDialogOpen}
         onOpenChange={setIsViewDialogOpen}
         faculty={selectedFaculty}
+      />
+
+      <HODReplacementDialog
+        open={isHODReplacementDialogOpen}
+        onOpenChange={setIsHODReplacementDialogOpen}
+        currentHOD={hodToReplace}
+        departmentFaculty={faculty.filter(f => f.faculty_department === hodToReplace?.faculty_department)}
+        onConfirm={handleHODReplacement}
+        isDeactivation={hodToReplace?.is_active === true}
       />
 
       {/* Department Dialogs */}

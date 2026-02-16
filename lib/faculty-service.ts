@@ -209,3 +209,96 @@ export async function getAvailableHODs(adminEmail?: string): Promise<Faculty[]> 
 
   return availableFaculty;
 }
+
+// Replace HOD with another faculty from the same department or disable department
+export async function replaceHOD(
+  currentHODId: number, 
+  newHODId: number | null, 
+  keepDepartmentActive: boolean = true,
+  deactivateOldHOD: boolean = false
+): Promise<void> {
+  // Get current HOD details
+  const { data: currentHOD, error: currentHODError } = await supabase
+    .from('faculty')
+    .select('*')
+    .eq('unique_id', currentHODId)
+    .single();
+
+  if (currentHODError) throw currentHODError;
+
+  // Get the department
+  const { data: department, error: deptError } = await supabase
+    .from('department')
+    .select('*')
+    .eq('department_hod_id', currentHODId)
+    .single();
+
+  if (deptError) throw deptError;
+
+  if (keepDepartmentActive) {
+    // Must have a new HOD to keep department active
+    if (!newHODId) {
+      throw new Error('New HOD must be selected to keep department active');
+    }
+
+    // Get new HOD details
+    const { data: newHOD, error: newHODError } = await supabase
+      .from('faculty')
+      .select('*')
+      .eq('unique_id', newHODId)
+      .single();
+
+    if (newHODError) throw newHODError;
+
+    // Verify both faculty are from the same department
+    if (currentHOD.faculty_department !== newHOD.faculty_department) {
+      throw new Error('New HOD must be from the same department as the current HOD');
+    }
+
+    // Verify new HOD is active
+    if (!newHOD.is_active) {
+      throw new Error('New HOD must be an active faculty member');
+    }
+
+    // Update department with new HOD (keep active)
+    const { error: updateDeptError } = await supabase
+      .from('department')
+      .update({ 
+        department_hod_id: newHODId,
+        is_active: true 
+      })
+      .eq('department_id', department.department_id);
+
+    if (updateDeptError) throw updateDeptError;
+
+    // Promote new HOD
+    const { error: promoteError } = await supabase
+      .from('faculty')
+      .update({ is_hod: true })
+      .eq('unique_id', newHODId);
+
+    if (promoteError) throw promoteError;
+  } else {
+    // Disable department (no new HOD)
+    const { error: updateDeptError } = await supabase
+      .from('department')
+      .update({ 
+        department_hod_id: null,
+        is_active: false 
+      })
+      .eq('department_id', department.department_id);
+
+    if (updateDeptError) throw updateDeptError;
+  }
+
+  // Demote current HOD (and optionally deactivate)
+  const { error: demoteError } = await supabase
+    .from('faculty')
+    .update({ 
+      is_hod: false, 
+      is_active: deactivateOldHOD ? false : currentHOD.is_active 
+    })
+    .eq('unique_id', currentHODId);
+
+  if (demoteError) throw demoteError;
+}
